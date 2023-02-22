@@ -28,7 +28,24 @@ int main(int argc,char **argv)
     cout << "SO3 updated = \n" << SO3_updated.matrix() << endl;
 
     cout << "*********************************************" << endl;
-    
+    Vector3d t(1,0,0);
+    Sophus::SE3d SE3_Rt(R,t);
+    Sophus::SE3d SE3_qt(q,t);
+    cout << "SE3 from R,t = \n" << SE3_Rt.matrix() << endl;
+    cout << "SE3 from q,t = \n" << SE3_qt.matrix() << endl;
+
+    typedef Eigen::Matrix<double,6,1> Vector6d;
+    Vector6d se3 = SE3_Rt.log();
+    cout << "se3 = " << se3.transpose() << endl;
+
+    cout << "se3 hat = \n" << Sophus::SE3d::hat(se3) << endl;
+    cout << "se3 hat vee = \n" << Sophus::SE3d::vee(Sophus::SE3d::hat(se3)).transpose() << endl;
+
+    Vector6d update_se3;
+    update_se3.setZero();
+    update_se3(0,0) = 1e-4d;
+    Sophus::SE3d SE3_updated = Sophus::SE3d::exp(update_se3) * SE3_Rt;
+    cout << "SE3 updated = " << endl << SE3_updated.matrix() << endl;
 
 
     return 0;
