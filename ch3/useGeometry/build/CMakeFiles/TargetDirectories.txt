@@ -1,3 +1,0 @@
-/home/ubuntu/slambook/ch3/useGeometry/build/CMakeFiles/rebuild_cache.dir
-/home/ubuntu/slambook/ch3/useGeometry/build/CMakeFiles/useGeometry.dir
-/home/ubuntu/slambook/ch3/useGeometry/build/CMakeFiles/edit_cache.dir
