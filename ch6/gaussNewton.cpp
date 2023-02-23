@@ -50,11 +50,35 @@ int main(int argc,char **argv)
         }
 
         Vector3d dx = H .ldlt().solve(b);
-        if(isnan)
+        if(isnan(dx[0]))
+        {
+            cout << "result is nan!" << endl;
+            break;
+        }
 
-        
-    }
+        if(iter >0 && cost >= lastCost)
+        {
+            cout << "cost: " << cost << " >= last cost: " << lastCost << ", break." <<endl;
+            break;
+        }
+
+        ae += dx[0];
+        be += dx[1];
+        ce += dx[2];
+
+        lastCost = cost;
+
+        cout << "total cost: " << cost << ", \t\tupdate: " << dx.transpose() 
+             << "\t\testimated params: " << ae << ", " << be << ", " << ce << end;         
     
+    }
+
+    chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+    chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2-t1);
+
+    cout << "solve time cost = " << time_used.count() << " seconds." << endl;
+    cout << "estimated abc = " << ae << ", " << "be" << ", " << ce << endl;
+    return 0;    
 
     
 }
