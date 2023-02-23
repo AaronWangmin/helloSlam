@@ -69,7 +69,7 @@ int main(int argc,char **argv)
         lastCost = cost;
 
         cout << "total cost: " << cost << ", \t\tupdate: " << dx.transpose() 
-             << "\t\testimated params: " << ae << ", " << be << ", " << ce << end;         
+             << "\t\testimated params: " << ae << ", " << be << ", " << ce << endl;         
     
     }
 
@@ -77,8 +77,9 @@ int main(int argc,char **argv)
     chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2-t1);
 
     cout << "solve time cost = " << time_used.count() << " seconds." << endl;
-    cout << "estimated abc = " << ae << ", " << "be" << ", " << ce << endl;
+    cout << "estimated abc = " << ae << ", " << be << ", " << ce << endl;
     return 0;    
 
     
 }
+
