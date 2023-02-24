@@ -7,16 +7,17 @@ using namespace std;
 
 struct CURVE_FITTING_COST 
 {
-    CURVE_FITTING_COST(double x,double y) : _x(x),_y(y) {}
+    CURVE_FITTING_COST(const double x,const double y) : _x(x),_y(y) {}
 
-    template <typename T>
-    bool operator()(const T* const abc, T* residual) const
+    template <typename T> 
+    bool operator()(const T* abc, T* residual) const
     {
         residual[0] = T(_y) - ceres::exp(abc[0] * T(_x) * T(_x) + abc[1] * T(_x) + abc[2]);
         return true;
     }
 
-    const double _x,_y;
+    private:
+        const double _x,_y;
 };
 
 int main(int argc,char **argv)
@@ -41,9 +42,9 @@ int main(int argc,char **argv)
     ceres::Problem problem;
     for (int i = 0; i < N; i++)
     {
-        CURVE_FITTING_COST* curveFittingCost = new ceres::AutoDiffCostFunction<CURVE_FITTING_COST,1,3>(
+        ceres::CostFunction* costFunction = new ceres::AutoDiffCostFunction<CURVE_FITTING_COST,1,3>(
                 new CURVE_FITTING_COST(x_data[i],y_data[i]));
-        problem.AddResidualBlock(curveFittingCost,nullptr,abc);
+        problem.AddResidualBlock(costFunction,nullptr,abc);
     }
 
     ceres::Solver::Options options;
