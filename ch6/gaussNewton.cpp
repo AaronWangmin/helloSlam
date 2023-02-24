@@ -58,7 +58,7 @@ int main(int argc,char **argv)
 
         if(iter >0 && cost >= lastCost)
         {
-            cout << "cost: " << cost << " >= last cost: " << lastCost << ", break." <<endl;
+            cout << "cost: " << cost << " >= last cost: " << lastCost << ", break." << endl;
             break;
         }
 
