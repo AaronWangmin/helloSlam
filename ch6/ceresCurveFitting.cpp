@@ -10,7 +10,7 @@ struct CURVE_FITTING_COST
     CURVE_FITTING_COST(const double x,const double y) : _x(x),_y(y) {}
 
     template <typename T> 
-    bool operator()(const T* abc, T* residual) const
+    bool operator()(const T* const abc, T* residual) const
     {
         residual[0] = T(_y) - ceres::exp(abc[0] * T(_x) * T(_x) + abc[1] * T(_x) + abc[2]);
         return true;
@@ -20,7 +20,7 @@ struct CURVE_FITTING_COST
         const double _x,_y;
 };
 
-int main(int argc,char **argv)
+int main(int argc,char** argv)
 {
     double ar = 1.0, br = 2.0, cr = 1.0;
     double ae = 2.0, be = -1.0, ce = 5.0;
@@ -61,7 +61,7 @@ int main(int argc,char **argv)
     cout << "estimated a,b,c = ";
     for (auto a : abc)
     {
-        cout << a << " ";        
+         cout << a << " ";        
     } 
     cout << endl;
 
