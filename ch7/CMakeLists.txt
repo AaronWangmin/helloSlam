@@ -11,3 +11,6 @@ target_link_libraries(orb_cv ${OpenCV_LIBS})
 
 add_executable(helloOpencv helloOpencv.cpp)
 target_link_libraries(helloOpencv ${OpenCV_LIBS})
+
+add_executable(pose_estimation_2d2d pose_estimation_2d2d.cpp)
+target_link_libraries(pose_estimation_2d2d ${OpenCV_LIBS})
