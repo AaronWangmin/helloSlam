@@ -26,5 +26,5 @@ add_executable(pose_estimation_3d2d pose_estimation_3d2d.cpp)
 #     g2o_core g2o_solver_eigen)
 
 target_link_libraries(pose_estimation_3d2d ${OpenCV_LIBS} ${Sophus_LIBRARIES}
-    g2o_core g2o_types_sba g2o_solver_eigen g2o_stuff)
+    g2o_core g2o_types_sba g2o_solver_eigen g2o_stuff g2o_types_slam3d)
  

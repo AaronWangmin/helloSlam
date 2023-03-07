@@ -66,6 +66,7 @@ int main(int argc,char** argv)
     Mat d1 = imread(argv[2],CV_LOAD_IMAGE_UNCHANGED);
     Mat d2 = imread(argv[4],CV_LOAD_IMAGE_UNCHANGED);
     Mat K = (Mat_<double>(3,3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
+
     vector<Point3d> pts_3d;
     vector<Point2f> pts_2d;
     for (DMatch m : matches)
@@ -80,9 +81,10 @@ int main(int argc,char** argv)
     }
 
     cout << "3d-2d pairs: " << pts_3d.size() << endl;
+    cout << "3d-2d pairs: " << pts_2d.size() << endl;
 
     Mat r,t;
-    solvePnP(pts_3d,pts_3d,K,Mat(),r,t,false,SOLVEPNP_EPNP);
+    solvePnP(pts_3d,pts_2d,K,Mat(),r,t,false,SOLVEPNP_EPNP);
     Mat R;
     cv::Rodrigues(r,R);
 
