@@ -74,10 +74,6 @@ int main(int argc,char **argv)
     cout << "time of ldlt decomposition is: " << 1000 * (clock() - time_stt) / (double)CLOCKS_PER_SEC << "ms" << endl;
     cout << "x = " << x.transpose() << endl;
 
-
-
-
-
     
 
     return 0;

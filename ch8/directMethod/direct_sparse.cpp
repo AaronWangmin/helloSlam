@@ -5,30 +5,35 @@
 #include <eigen3/Eigen/Geometry>
 
 #include <opencv2/core/core.hpp>
-#include <opencv2/ccalib.hpp>
+// #include <opencv2/ccalib.hpp>
 // #include <opencv2/imgproc/imgproc.hpp>
 // #include <opencv2/highgui/highgui.hpp>
-// #include <opencv2/features2d/features2d.hpp>
+// #include <opencv2/features2d/features2d
 
-
+#include <g2o/core/g2o_core_api.h>
 #include <g2o/core/base_vertex.hpp>
 #include <g2o/core/base_unary_edge.h>
 #include <g2o/types/sba/vertex_se3_expmap.h>
+#include <g2o/core/sparse_optimizer.h>
+#include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/solvers/dense/linear_solver_dense.h>
+#include <g2o/core/robust_kernel.h>
+#include <g2o/core/block_solver.h>
 
 struct Measurement
 {
     Measurement(Eigen::Vector3d p, float g)
-        : pose_world(p),
+        : pos_world(p),
           grayscale(g) 
     {}
 
-    Eigen::vector3d pos_world;
+    Eigen::Vector3d pos_world;
     float grayscale;
 };
 
 inline Eigen::Vector3d project2Dto3D(
-    int x, y, d,
-    float fx, fy, cx, cy, scale)
+    int x, int y, int d,
+    float fx, float fy, float cx, float cy, float scale)
 {
     float zz = float(d) / scale;
     float xx = zz * (x - cx) / fx;
@@ -37,9 +42,8 @@ inline Eigen::Vector3d project2Dto3D(
 }
 
 inline Eigen::Vector2d project3Dto2D(
-    float x, y, z,
-    float fx, fy, cx, cy
-)
+    float x, float y, float z,
+    float fx, float fy, float cx, float cy)
 {
     float u = fx * x / z + cx;
     float v = fy * y / z + cy;
@@ -47,11 +51,12 @@ inline Eigen::Vector2d project3Dto2D(
 }
 
 bool poseEstimationDirector(
-    const vector<Measurement>& measurements,
+    const std::vector<Measurement>& measurements,
     cv::Mat* gray,
     Eigen::Matrix3f& intrinsics,
-    Eigen::Isometry3d& Tcw
-);
+    Eigen::Isometry3d& Tcw);
+
+
 
 class EdgeSE3ProjectDirect: public g2o::BaseUnaryEdge<1,double, g2o::VertexSE3Expmap>
 {
@@ -61,9 +66,9 @@ public:
     EdgeSE3ProjectDirect() {}
 
     EdgeSE3ProjectDirect(Eigen::Vector3d point,
-                        float fx, fy, cx, cy,
+                        float fx, float fy, float cx, float cy,
                         cv::Mat* img)
-        : x_word_(point),fx_(fx), fy_(fy), cx_(cx), cy_(cy),image_(image)
+        : x_world_(point),fx_(fx), fy_(fy), cx_(cx), cy_(cy),image_(img)
     {}
 
     virtual void computeError()
@@ -73,7 +78,7 @@ public:
         float x = x_local[0] * fx_ / x_local[2] + cx_;
         float y = x_local[1] * fy_ / x_local[2] + cy_;
 
-        if (x - 4 < 0 || x + 4 > image_->cols || y - 4 < 0 || y + 4 ? image_->rows)
+        if (x - 4 < 0 || x + 4 > image_->cols || y - 4 < 0 || y + 4 > image_->rows)
         {
             _error(0,0) = 0.0;
             this->setLevel(1);
@@ -81,7 +86,7 @@ public:
         else
         {
             _error(0,0) = this->getPixelValue(x,y) - _measurement;
-        }
+        }        
     }
 
     virtual void linearizeOplus()
@@ -126,7 +131,7 @@ public:
     }
 
     virtual bool read(std::istream& in) {}
-    virtual boll write(std::ostream& out) {}
+    virtual bool write(std::ostream& out) const {}
 
 protected:
     inline float getPixelValue(float x,float y)
@@ -140,10 +145,7 @@ protected:
             (1 - xx) * yy * data[image_->step] +
             xx * yy * data[image_->step+1]
         );
-
-
     }
-
 
 public:
     Eigen::Vector3d x_world_;
@@ -151,3 +153,53 @@ public:
     cv::Mat* image_ = nullptr;
 
 };
+
+bool poseEstimationDirect(    
+    const std::vector<Measurement>& measurements,
+    cv::Mat* gray,
+    Eigen::Matrix3f& K,
+    Eigen::Isometry3d& Tcw)
+{
+    // -- first: create BlockSolve
+    typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,1>> BlockSolver_6_1;
+
+    // -- second: create linearSolver
+    std::unique_ptr<BlockSolver_6_1::LinearSolverType> linearSolver;          
+    linearSolver = g2o::make_unique<g2o::LinearSolverDense<BlockSolver_6_1::PoseMatrixType>>();
+
+    // -- third: create solver
+    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(
+        g2o::make_unique<BlockSolver_6_1>(std::move(linearSolver)));
+
+    // -- 4th: create optimizer
+    g2o::SparseOptimizer optimizer;
+    optimizer.setAlgorithm(solver);
+    optimizer.setVerbose(true);
+
+    // -- 5th: add vertex
+    g2o::VertexSE3Expmap* pose = new g2o::VertexSE3Expmap();
+    pose->setEstimate(g2o::SE3Quat(Tcw.rotation(),Tcw.translation()));
+    pose->setId(0);
+    optimizer.addVertex(pose);
+
+    // -- 6th: add edge
+    int id = 1;
+    for (Measurement m : measurements)
+    {
+        EdgeSE3ProjectDirect* edge = new EdgeSE3ProjectDirect(
+            m.pos_world,
+            K(0,0), K(1,1), K(0,2), K(1,2), gray);
+        edge->setVertex(0,pose);
+        edge->setMeasurement(m.grayscale);
+        edge->setInformation(Eigen::Matrix<double,1,1>::Identity());
+        edge->setId(id++);
+        optimizer.addEdge(edge);
+    }
+    std::cout << "edges in graph: " << optimizer.edges().size() << std::endl;
+
+    // 7th: optimize
+    optimizer.initializeOptimization();
+    optimizer.optimize(30);
+    Tcw = pose->estimate();  
+    
+}
