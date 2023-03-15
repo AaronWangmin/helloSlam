@@ -1,17 +1,22 @@
 
+#include <string>
 #include <vector>
+#include <iostream>
+#include <fstream>
+
+#include <chrono>
 
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Geometry>
 
 #include <opencv2/core/core.hpp>
 // #include <opencv2/ccalib.hpp>
-// #include <opencv2/imgproc/imgproc.hpp>
-// #include <opencv2/highgui/highgui.hpp>
-// #include <opencv2/features2d/features2d
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
 #include <g2o/core/g2o_core_api.h>
-#include <g2o/core/base_vertex.hpp>
+// #include <g2o/core/base_vertex.hpp>
 #include <g2o/core/base_unary_edge.h>
 #include <g2o/types/sba/vertex_se3_expmap.h>
 #include <g2o/core/sparse_optimizer.h>
@@ -127,6 +132,8 @@ public:
         
         jacobain_pixel_uv(0,0) = (this->getPixelValue(u+1,v) - this->getPixelValue(u-1,v)) / 2;
         jacobain_pixel_uv(0,1) = (this->getPixelValue(u,v+1) - this->getPixelValue(u,v-1)) / 2;
+
+        _jacobianOplusXi = jacobain_pixel_uv * jacobian_uv_ksia;
         
     }
 
@@ -201,5 +208,104 @@ bool poseEstimationDirect(
     optimizer.initializeOptimization();
     optimizer.optimize(30);
     Tcw = pose->estimate();  
+
+}
+
+int main(int argc, char** argv)
+{
+    if (argc != 2)
+    {
+        std::cout << "usage: useLK path_to_dataset " << std::endl;
+        return 1;
+    }
+
+    srand((unsigned int)time(0));
+    std::string path_to_dataset = argv[1];
+    std::string associate_file = path_to_dataset + "/associate.txt";
+
+    std::ifstream fin(associate_file);
+
+    std::string rgb_file, depth_file, time_rgb, time_depth;
+    cv::Mat color, depth, gray;
+    std::vector<Measurement> measurements;
+
+    // camera parametes
+    float cx = 325.5, cy = 253.5, fx = 518.0, fy = 519.0;
+    float depth_scale = 1000.0;
+    Eigen::Matrix3f K;
+    K << fx, 0.f, cx, 0.f, fy, cy, 0.f, 0.f, 1.0f;
+
+    Eigen::Isometry3d Tcw = Eigen::Isometry3d::Identity();
+
+    cv::Mat prev_color;
+    for (int index = 0; index < 10; index++)
+    {
+        std::cout << "*********** loop " << index << " **********" << std::endl;
+        fin >> time_rgb >> rgb_file >> time_depth >> depth_file;
+        color = cv::imread(path_to_dataset + "/" + rgb_file);
+        depth = cv::imread(path_to_dataset + "/" + depth_file, -1);
+        if (color.data == nullptr || depth.data == nullptr)
+            continue;
+        cv::cvtColor(color,gray,cv::COLOR_BGR2GRAY);
+        if (index == 0)
+        {
+            std::vector<cv::KeyPoint> keypoints;
+            cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create();
+            detector->detect(color,keypoints);
+            for (auto kp : keypoints)
+            {
+                if(kp.pt.x < 20 || kp.pt.y < 20 || (kp.pt.x + 20) > color.cols || (kp.pt.y + 20) > color.rows)
+                    continue;
+                
+                ushort d = depth.ptr<ushort>(cvRound(kp.pt.y))[cvRound(kp.pt.x)];
+                if(d == 0)
+                    continue;
+                
+                Eigen::Vector3d p3d = project2Dto3D(kp.pt.x, kp.pt.y, d, fx,fy, cx, cy, depth_scale);
+                float grayscale = float(gray.ptr<uchar>(cvRound(kp.pt.y))[cvRound(kp.pt.x)]);
+                measurements.push_back(Measurement(p3d,grayscale));
+            }
+            prev_color = color.clone();
+            continue;            
+        }
+
+        std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+        poseEstimationDirect(measurements, &gray, K, Tcw);
+        std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+        std::chrono::duration<double> time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+        std::cout << "direct method costs time: " << time_used.count() << " seconds." << std::endl;
+        std::cout << "Tcw = " << Tcw.matrix() << std::endl;
+
+        // plot the feature points
+        cv::Mat img_show(color.rows * 2, color.cols, CV_8UC3);
+        prev_color.copyTo(img_show(cv::Rect(0, 0, color.cols, color.rows)));
+        color.copyTo(img_show(cv::Rect(0, color.rows, color.cols, color.rows)));
+        for (Measurement m: measurements)
+        {
+            if( rand() > RAND_MAX / 5)
+                continue;
+            Eigen::Vector3d p = m.pos_world;
+            Eigen::Vector2d pixel_prev = project3Dto2D(p(0,0), p(1,0), p(2,0),fx, fy, cx, cy);
+            Eigen::Vector3d p2 = Tcw * m.pos_world;
+            Eigen::Vector2d pixel_now = project3Dto2D(p2(0,0), p2(1,0), p2(2,0),fx, fy, cx, cy);
+
+            if(pixel_now(0,0) < 0 || pixel_now(0,0) >= color.cols || pixel_now(1,0) < 0 || pixel_now(1,0) >= color.rows)
+                continue;
+            
+            float b = 255 * float(rand()) / RAND_MAX;
+            float g = 255 * float(rand()) / RAND_MAX;
+            float r = 255 * float(rand()) / RAND_MAX;
+
+            cv::circle(img_show, cv::Point2d(pixel_prev(0,0),pixel_prev(1,0)),8, cv::Scalar(b,g,r), 2);
+            cv::circle(img_show, cv::Point2d(pixel_now(0,0), pixel_now(1,0) + color.rows), 8, cv::Scalar(b,r,r),2);
+            cv::line(img_show, cv::Point2d(pixel_prev(0.0),pixel_prev(1,0)), 
+                cv::Point2d(pixel_now(0,0),pixel_now(1,0) + color.rows),
+                cv::Scalar(b,g,r),1);
+        }
+        cv::imshow("result", img_show);
+        cv::waitKey(0);       
+        
+    }
+    return 0;    
     
 }
