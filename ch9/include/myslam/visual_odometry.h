@@ -57,7 +57,7 @@ public:
 protected:  
     // inner operation
     void extractKeyPoints();
-    void computeDescriptors();
+    void computeDescriptors();    
     void featureMatching();
     void poseEstimationPnP();
     void optimizeMap();

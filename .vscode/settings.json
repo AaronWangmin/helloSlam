@@ -1,7 +1,15 @@
 {
     "files.associations": {
         "core": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "new": "cpp",
+        "*.tcc": "cpp",
+        "fstream": "cpp",
+        "iosfwd": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "sstream": "cpp",
+        "streambuf": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
